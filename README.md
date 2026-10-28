@@ -1,6 +1,18 @@
-# hello-world
+# Browser games
 
-At December 31, 2017 I made a 'New Year resolution' that in 2018 I'll become a freelance software developer. In order to achieve this dare goal I started to learn Python and naturally came across GitHub as an industry standard for version control. My journey starts here!
+I made a few browser games (AI assisted):
 
-Cheers!
-Alex Stepanov
+- 2048 clone
+- Arkanoid clone
+- Color Lines clone
+- Mahjong Solitaire clone
+- Minesweeper clone
+- Pac-Man clone
+- Pong clone
+- Snake clone
+- Space Invaders clone
+- Sudoku clone
+- Suika clone (all your own 'suika_BGM.mp3' file to have full experience)
+- Tetris clone
+
+All games are made for the sake of learning and experimenting with AI assisted programming.
