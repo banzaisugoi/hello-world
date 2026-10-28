@@ -4,6 +4,7 @@ I made a few browser games (AI assisted):
 
 - 2048 clone
 - Arkanoid clone
+- AdVenture Capitalist clone
 - Color Lines clone
 - Mahjong Solitaire clone
 - Minesweeper clone
