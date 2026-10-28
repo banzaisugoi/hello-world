@@ -24,6 +24,11 @@ I made a few browser games (AI assisted). Play them here:
 
 ---
 
+### [Hontoni-san (Match 3)](https://banzaisugoi.github.io/hello-world/Hontoni-san/)
+[![Hontoni-san (Match 3)](./screenshots/Hontoni-san.jpg)](https://banzaisugoi.github.io/hello-world/Hontoni-san/)
+
+---
+
 ### [Mahjong Solitaire clone](https://banzaisugoi.github.io/hello-world/Mahjong%20Solitaire%20clone/)
 [![Mahjong Solitaire clone](./screenshots/Mahjong_Solitaire_clone.jpg)](https://banzaisugoi.github.io/hello-world/Mahjong%20Solitaire%20clone/)
 
