@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retro Pong</title>
+    <style>
+        body {
+            background-color: #111;
+            color: #eee;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            font-family: 'Courier New', Courier, monospace;
+            overflow: hidden;
+        }
+
+        h1 {
+            margin-top: 0;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            color: #444;
+            font-size: 24px;
+        }
+
+        #gameContainer {
+            position: relative;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+            border: 4px solid #333;
+            border-radius: 4px;
+        }
+
+        canvas {
+            display: block;
+            background-color: #000;
+            cursor: none;
+        }
+
+        .controls-hint {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        /* Scanline effect for retro feel */
+        .scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0,0,0,0.1) 50%,
+                rgba(0,0,0,0.1)
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Retro Pong</h1>
+
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="500"></canvas>
+        <div class="scanlines"></div>
+    </div>
+
+    <p class="controls-hint">Mouse or Touch to move the left paddle.</p>
+
+<script>
+    // Game Constants & Setup
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Colors
+    const COLOR_PADDLE = '#33ff33';
+    const COLOR_BALL = '#ffffff';
+    
+    // Dimensions
+    const paddleHeight = 100;
+    const paddleThickness = 10;
+
+    // Game Objects
+    const ball = {
+        x: canvas.width / 2,
+        y: canvas.height / 2,
+        radius: 8,
+        speed: 7,
+        velocityX: 5,
+        velocityY: 5,
+        
+        reset: function() {
+            this.x = canvas.width / 2;
+            this.y = canvas.height / 2;
+            this.speed = 7; // Reset speed to base value
+            
+            // Randomize start direction
+            this.velocityX = (Math.random() > 0.5 ? 1 : -1) * this.speed; 
+            this.velocityY = (Math.random() * 2 - 1) * this.speed;
+            
+            // Prevent the ball from bouncing perfectly horizontally forever
+            if (Math.abs(this.velocityY) < 2) {
+                this.velocityY = this.velocityY < 0 ? -2 : 2;
+            }
+        }
+    };
+
+    // Human player (Left side)
+    const player = {
+        x: 10,
+        y: canvas.height / 2 - paddleHeight / 2,
+        width: paddleThickness,
+        score: 0
+    };
+
+    // Computer (Right side)
+    const computer = {
+        x: canvas.width - 20,
+        y: canvas.height / 2 - paddleHeight / 2,
+        width: paddleThickness,
+        score: 0
+    };
+
+    // Inputs
+    function updatePlayerPosition(e) {
+        const rect = canvas.getBoundingClientRect();
+        let mouseY = e.clientY - rect.top;
+        player.y = mouseY - (paddleHeight / 2);
+
+        if(player.y < 0) player.y = 0;
+        if(player.y > canvas.height - paddleHeight) player.y = canvas.height - paddleHeight;
+    }
+
+    canvas.addEventListener('mousemove', updatePlayerPosition);
+    canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        if (e.touches.length > 0) {
+            updatePlayerPosition(e.touches[0]);
+        }
+    }, {passive: false});
+
+    // --- DRAWING FUNCTIONS ---
+    function drawNet() {
+        // FIXED: setLineDash requires an array. Passing a number throws a fatal error.
+        ctx.setLineDash([15, 15]); 
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#333';
+        for(let i=0; i<=canvas.height; i+=28) {
+            ctx.beginPath();
+            ctx.moveTo(canvas.width/2, i);
+            ctx.lineTo(canvas.width/2 - 2, i);
+            ctx.stroke();
+        }
+        ctx.setLineDash([]);
+    }
+
+    function drawRect(x, y, w, h, color) {
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, w, h);
+    }
+
+    function drawCircle(x, y, r, color) {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI*2, false);
+        ctx.closePath();
+        ctx.fill();
+    }
+
+    // --- GAME LOGIC ---
+    function movePaddles() {
+        let targetY = ball.y - (paddleHeight / 2);
+        // Simple lerp for smooth AI movement
+        computer.y += (targetY - computer.y) * 0.1;
+        if(computer.y < 0) computer.y = 0;
+        if(computer.y > canvas.height - paddleHeight) computer.y = canvas.height - paddleHeight;
+    }
+
+    function collision(b, p) {
+        let pTop = p.y;
+        let pBottom = p.y + paddleHeight;
+        let pLeft = p.x;
+        let pRight = (p.x + p.width);
+        
+        // FIXED: Declared with `let` to prevent strict mode crashes
+        let bTop = b.y - b.radius;
+        let bBottom = b.y + b.radius;
+        let bLeft = b.x - b.radius;
+        let bRight = b.x + b.radius;
+
+        if(bTop < pBottom && bBottom > pTop && bRight > pLeft && bLeft < pRight){
+            return true;
+        }
+        return false;
+    }
+
+    function resetBall() {
+        ball.reset();
+    }
+
+    function update() {
+        movePaddles();
+        ball.x += ball.velocityX;
+        ball.y += ball.velocityY;
+
+        // Wall Collision
+        if(ball.y - ball.radius < 0 || ball.y + ball.radius > canvas.height) {
+            ball.velocityY = -ball.velocityY;
+        }
+
+        let playerObj = (ball.x < canvas.width / 2) ? player : computer;
+
+        if (collision(ball, playerObj)) {
+            // Calculate where the ball hit the paddle
+            let collidePoint = ball.y - (playerObj.y + paddleHeight/2);
+            collidePoint = collidePoint / (paddleHeight/2);
+            let angleRad = (Math.PI/4) * collidePoint;
+            let direction = (ball.x < canvas.width/2) ? 1 : -1;
+
+            ball.velocityX = direction * ball.speed * Math.cos(angleRad);
+            ball.velocityY = ball.speed * Math.sin(angleRad);
+            
+            ball.speed += 0.2; 
+        }
+
+        // Score Update
+        if(ball.x - ball.radius < 0) {
+            computer.score++;
+            resetBall();
+        } else if(ball.x + ball.radius > canvas.width) {
+            player.score++;
+            resetBall();
+        }
+    }
+
+    function render() {
+        drawRect(0, 0, canvas.width, canvas.height, "#000");
+        drawNet();
+        drawRect(player.x, player.y, player.width, paddleHeight, COLOR_PADDLE);
+        drawRect(computer.x, computer.y, computer.width, paddleHeight, COLOR_PADDLE);
+
+        // FIXED: Moved right score from 1.25 (off-screen) to 0.75 (visible)
+        ctx.font = "20px Courier New";
+        ctx.fillStyle = "#555";
+        ctx.fillText(player.score, canvas.width/4 - 10, 30);
+        ctx.fillText(computer.score, canvas.width*0.75 - 10, 30);
+
+        drawCircle(ball.x, ball.y, ball.radius, COLOR_BALL);
+    }
+
+    function gameLoop() {
+        update();
+        render();
+        requestAnimationFrame(gameLoop);
+    }
+
+    resetBall();
+    gameLoop();
+</script>
+</body>
+</html>

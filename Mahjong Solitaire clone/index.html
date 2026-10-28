@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="google" content="notranslate">
+<title>Mahjong Solitaire</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: radial-gradient(1200px 900px at 50% -15%, #1e4468 0%, #0d1f33 45%, #04080e 100%);
+    color: #dbe7f3;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .app { height: 100%; display: flex; flex-direction: column; }
+
+  /* ---------- Top bar ---------- */
+  .topbar {
+    display: flex; align-items: center; gap: 14px;
+    padding: 9px 16px;
+    background: linear-gradient(180deg, rgba(22,50,79,.95), rgba(8,20,34,.9));
+    border-bottom: 1px solid rgba(120,180,255,.15);
+    box-shadow: 0 6px 24px rgba(0,0,0,.45);
+    z-index: 10;
+    flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 16px; letter-spacing: .3px; white-space: nowrap; }
+  .brand .logo { font-size: 20px; line-height: 1; filter: drop-shadow(0 2px 4px rgba(0,0,0,.5)); }
+  .brand .txt { background: linear-gradient(180deg,#ffffff,#9fc4e8); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+  .stats { display: flex; gap: 20px; margin: 0 auto; }
+  .stat { display: flex; flex-direction: column; align-items: center; }
+  .stat .k { font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: #6f9ac2; }
+  .stat .v { font-size: 15px; font-weight: 700; color: #eaf4ff; font-variant-numeric: tabular-nums; }
+
+  .actions { display: flex; gap: 7px; }
+  .btn {
+    font: inherit; font-size: 12.5px; font-weight: 600;
+    color: #cfe4ff;
+    background: linear-gradient(180deg, #2a4d72, #182f4a);
+    border: 1px solid rgba(140,190,255,.22);
+    border-radius: 9px;
+    padding: 7px 13px;
+    cursor: pointer;
+    transition: background .15s, color .15s, transform .08s, box-shadow .15s;
+    box-shadow: 0 2px 0 rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.12);
+    white-space: nowrap;
+  }
+  .btn:hover { background: linear-gradient(180deg, #37628f, #20406a); color: #fff; }
+  .btn:active { transform: translateY(2px); box-shadow: 0 0 0 rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.12); }
+  .btn:disabled { opacity: .35; cursor: default; transform: none; }
+  .btn.icon { padding: 7px 10px; font-size: 14px; }
+  .btn.primary {
+    background: linear-gradient(180deg, #f7c455, #d78f14);
+    color: #2a1a00; border-color: #ffe08a;
+    box-shadow: 0 2px 0 rgba(120,70,0,.6), inset 0 1px 0 rgba(255,255,255,.5);
+  }
+  .btn.primary:hover { background: linear-gradient(180deg, #ffd370, #e9a01d); }
+
+  /* ---------- Board ---------- */
+  .board-wrap { flex: 1; position: relative; overflow: hidden; }
+  .board {
+    position: absolute; left: 50%; top: 50%;
+    width: 700px; height: 640px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+  }
+
+  /* ---------- Tiles ---------- */
+  .tile {
+    position: absolute;
+    width: 58px; height: 78px;
+    border-radius: 7px;
+    background: linear-gradient(155deg, #fffef9 0%, #f8f2e2 40%, #eee3c8 75%, #e2d5b4 100%);
+    box-shadow:
+      inset 0 2px 3px rgba(255,255,255,.95),
+      inset 0 -2px 4px rgba(150,130,90,.30),
+      inset 2px 0 3px rgba(255,255,255,.55),
+      inset -2px 0 3px rgba(150,130,90,.18),
+      0 0 0 1px rgba(120,98,64,.55),
+      3px 4px 0 0 #c9b48c,
+      4px 6px 0 0 #a8916a,
+      6px 9px 13px rgba(0,0,0,.55);
+    cursor: pointer;
+    transition: opacity .25s ease, transform .25s ease;
+    contain: layout style;
+  }
+  .tile svg { display: block; width: 100%; height: 100%; }
+  .tile::after {
+    content: '';
+    position: absolute; inset: 0;
+    border-radius: 7px;
+    pointer-events: none;
+    box-shadow: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0);
+    transition: box-shadow .16s ease;
+  }
+  .tile.sel::after {
+    box-shadow: inset 0 0 0 3px #ffc93c, inset 0 0 16px rgba(255,190,40,.95);
+  }
+  .tile.hint::after {
+    box-shadow: inset 0 0 0 3px #4ee6a8, inset 0 0 16px rgba(78,230,168,.9);
+    animation: hintPulse .7s ease-in-out infinite alternate;
+  }
+  @keyframes hintPulse {
+    from { box-shadow: inset 0 0 0 3px #4ee6a8, inset 0 0 8px rgba(78,230,168,.6); }
+    to   { box-shadow: inset 0 0 0 3px #8affd0, inset 0 0 20px rgba(120,255,200,1); }
+  }
+  .tile.gone {
+    transform: scale(1.35) rotate(6deg);
+    opacity: 0;
+    filter: brightness(1.6);
+    pointer-events: none;
+  }
+  .tile.appear { animation: appearIn .35s cubic-bezier(.2,1.4,.5,1); }
+  @keyframes appearIn {
+    from { transform: scale(.4) rotate(-8deg); opacity: 0; }
+    to   { transform: scale(1) rotate(0); opacity: 1; }
+  }
+  .tile.shake { animation: shakeX .28s ease; }
+  @keyframes shakeX {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    70% { transform: translateX(5px); }
+  }
+  .tile.pulse { animation: tilePulse .4s ease; }
+  @keyframes tilePulse {
+    0% { transform: scale(1); }
+    45% { transform: scale(.86); }
+    100% { transform: scale(1); }
+  }
+
+  /* ---------- Toast ---------- */
+  .toast {
+    position: fixed; left: 50%; bottom: 34px;
+    transform: translate(-50%, 18px);
+    background: rgba(18,38,62,.96);
+    border: 1px solid rgba(140,190,255,.3);
+    box-shadow: 0 12px 40px rgba(0,0,0,.55);
+    padding: 12px 24px; border-radius: 13px;
+    font-size: 14px; font-weight: 600; color: #dfeeff;
+    opacity: 0; pointer-events: none;
+    transition: opacity .3s, transform .3s;
+    z-index: 100; white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ---------- Win overlay ---------- */
+  .overlay {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(3,10,20,.78);
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
+    opacity: 0; pointer-events: none;
+    transition: opacity .4s ease;
+    z-index: 200;
+  }
+  .overlay.show { opacity: 1; pointer-events: auto; }
+  .dialog {
+    text-align: center;
+    padding: 40px 56px;
+    border-radius: 22px;
+    background: linear-gradient(180deg, #17334f, #0b1c2e);
+    border: 1px solid rgba(140,190,255,.28);
+    box-shadow: 0 30px 80px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.12);
+    transform: scale(.85);
+    transition: transform .45s cubic-bezier(.2,1.5,.4,1);
+  }
+  .overlay.show .dialog { transform: scale(1); }
+  .dialog h1 {
+    margin: 0 0 8px; font-size: 30px;
+    background: linear-gradient(180deg,#ffe9a8,#f0b93c);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .dialog p { margin: 0 0 26px; color: #9dc0e2; font-size: 15px; }
+
+  @media (max-width: 720px) {
+    .brand .txt { display: none; }
+    .stats { gap: 12px; }
+    .btn { padding: 7px 10px; font-size: 11.5px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><span class="logo">🀄</span><span class="txt">Mahjong Solitaire</span></div>
+    <div class="stats">
+      <div class="stat"><span class="k">Tiles</span><span class="v" id="stat-tiles">144</span></div>
+      <div class="stat"><span class="k">Time</span><span class="v" id="stat-time">0:00</span></div>
+      <div class="stat"><span class="k">Matches</span><span class="v" id="stat-matches">0</span></div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="btn-new">New</button>
+      <button class="btn" id="btn-shuffle">Shuffle</button>
+      <button class="btn" id="btn-hint">Hint</button>
+      <button class="btn" id="btn-undo">Undo</button>
+      <button class="btn icon" id="btn-sound">🔊</button>
+    </div>
+  </header>
+  <main class="board-wrap">
+    <div class="board" id="board"></div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="overlay" id="overlay">
+  <div class="dialog">
+    <h1>You Win! 🎉</h1>
+    <p id="win-msg">All tiles cleared.</p>
+    <button class="btn primary" id="btn-again">Play Again</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* =========================================================
+     AUDIO
+     ========================================================= */
+  let actx = null;
+  let soundOn = true;
+
+  function ensureAudio() {
+    if (!actx) {
+      try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; }
+    }
+    if (actx && actx.state === 'suspended') actx.resume();
+  }
+
+  function beep(freq, start, dur, type, vol) {
+    if (!soundOn || !actx) return;
+    type = type || 'sine'; vol = vol == null ? 0.16 : vol;
+    const t = actx.currentTime + start;
+    const osc = actx.createOscillator();
+    const g = actx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(g).connect(actx.destination);
+    osc.start(t);
+    osc.stop(t + dur + 0.06);
+  }
+
+  function noiseBurst(start, dur, vol, freq) {
+    if (!soundOn || !actx) return;
+    const t = actx.currentTime + start;
+    const len = Math.max(1, Math.floor(actx.sampleRate * dur));
+    const buf = actx.createBuffer(1, len, actx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) {
+      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.2);
+    }
+    const src = actx.createBufferSource();
+    src.buffer = buf;
+    const bp = actx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = freq;
+    bp.Q.value = 1.1;
+    const g = actx.createGain();
+    g.gain.value = vol;
+    src.connect(bp).connect(g).connect(actx.destination);
+    src.start(t);
+  }
+
+  const SFX = {
+    select: function () {
+      beep(720, 0, 0.07, 'triangle', 0.12);
+      beep(1080, 0.02, 0.05, 'sine', 0.05);
+    },
+    match: function () {
+      beep(784, 0, 0.13, 'sine', 0.15);
+      beep(1175, 0.07, 0.18, 'sine', 0.13);
+      beep(1568, 0.14, 0.22, 'sine', 0.07);
+      noiseBurst(0, 0.09, 0.09, 3200);
+    },
+    error: function () {
+      beep(170, 0, 0.14, 'sawtooth', 0.09);
+      beep(130, 0.05, 0.16, 'square', 0.05);
+    },
+    shuffle: function () {
+      noiseBurst(0, 0.34, 0.22, 850);
+      noiseBurst(0.1, 0.28, 0.16, 1700);
+      beep(440, 0.05, 0.16, 'sine', 0.05);
+    },
+    hint: function () {
+      beep(880, 0, 0.09, 'sine', 0.09);
+      beep(1174, 0.08, 0.12, 'sine', 0.07);
+    },
+    undo: function () {
+      beep(520, 0, 0.08, 'triangle', 0.1);
+      beep(390, 0.06, 0.11, 'triangle', 0.08);
+    },
+    win: function () {
+      [523, 659, 784, 1047, 1319, 1568].forEach(function (f, i) {
+        beep(f, i * 0.105, 0.55, 'sine', 0.14);
+      });
+      beep(261, 0, 1.1, 'triangle', 0.07);
+    }
+  };
+
+  /* =========================================================
+     LAYOUT
+     ========================================================= */
+  const HALF_W = 29, HALF_H = 39, TILE_W = 58, TILE_H = 78;
+  const BOARD_W = 700, BOARD_H = 640;
+
+  function buildLayout() {
+    const out = [];
+    // Layer 0
+    for (let y = 0; y <= 14; y += 2) {
+      for (let x = 0; x <= 22; x += 2) {
+        if ((x === 0 || x === 22) && (y === 0 || y === 14)) continue;
+        out.push({ x: x, y: y, z: 0 });
+      }
+    }
+    // Layer 1
+    for (let y = 4; y <= 10; y += 2)
+      for (let x = 3; x <= 19; x += 2)
+        out.push({ x: x, y: y, z: 1 });
+    // Layer 2
+    for (let y = 6; y <= 8; y += 2)
+      for (let x = 6; x <= 16; x += 2)
+        out.push({ x: x, y: y, z: 2 });
+    // Layer 3
+    for (let x = 8; x <= 14; x += 2)
+      out.push({ x: x, y: 7, z: 3 });
+    return out;
+  }
+
+  /* =========================================================
+     TILE FACES
+     ========================================================= */
+  const CJK = 'Songti SC, SimSun, Noto Serif CJK SC, Source Han Serif SC, STSong, serif';
+
+  const DOT_POS = {
+    1: [[29, 39]],
+    2: [[29, 24], [29, 54]],
+    3: [[16, 20], [29, 39], [42, 58]],
+    4: [[16, 22], [42, 22], [16, 56], [42, 56]],
+    5: [[16, 20], [42, 20], [29, 39], [16, 58], [42, 58]],
+    6: [[16, 18], [16, 39], [16, 60], [42, 18], [42, 39], [42, 60]],
+    7: [[16, 18], [29, 18], [42, 18], [16, 44], [42, 44], [16, 63], [42, 63]],
+    8: [[18, 15], [40, 15], [18, 31], [40, 31], [18, 47], [40, 47], [18, 63], [40, 63]],
+    9: [[16, 18], [29, 18], [42, 18], [16, 39], [29, 39], [42, 39], [16, 60], [29, 60], [42, 60]]
+  };
+  const DOT_R = { 1: 13, 2: 10.5, 3: 9, 4: 9, 5: 8.5, 6: 8, 7: 7.5, 8: 7, 9: 7 };
+  const DOT_COLORS = ['#1b5fa8', '#c0392b', '#1e7a4a'];
+
+  const BAMBOO_POS = {
+    2: [[20, 39, 26], [38, 39, 26]],
+    3: [[29, 25, 24], [19, 55, 22], [39, 55, 22]],
+    4: [[20, 25, 24], [38, 25, 24], [20, 55, 24], [38, 55, 24]],
+    5: [[18, 22, 17], [40, 22, 17], [29, 40, 17], [18, 58, 17], [40, 58, 17]],
+    6: [[16, 24, 22], [29, 24, 22], [42, 24, 22], [16, 54, 22], [29, 54, 22], [42, 54, 22]],
+    7: [[29, 17, 17], [16, 39, 17], [29, 39, 17], [42, 39, 17], [16, 60, 17], [29, 60, 17], [42, 60, 17]],
+    8: [[18, 16, 15], [40, 16, 15], [18, 32, 15], [40, 32, 15], [18, 48, 15], [40, 48, 15], [18, 64, 15], [40, 64, 15]],
+    9: [[16, 18, 18], [29, 18, 18], [42, 18, 18], [16, 39, 18], [29, 39, 18], [42, 39, 18], [16, 60, 18], [29, 60, 18], [42, 60, 18]]
+  };
+
+  const CHR_NUM = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+  const WINDS = ['東', '南', '西', '北'];
+  const FLOWERS = ['梅', '蘭', '菊', '竹'];
+  const SEASONS = ['春', '夏', '秋', '冬'];
+
+  function stick(cx, cy, len, color) {
+    const w = 6;
+    const y = cy - len / 2;
+    return '<rect x="' + (cx - w / 2) + '" y="' + y + '" width="' + w + '" height="' + len +
+           '" rx="' + (w / 2) + '" fill="' + color + '"/>' +
+           '<rect x="' + (cx - w / 2) + '" y="' + (cy - 1.6) + '" width="' + w +
+           '" height="3.2" fill="#ffffff" opacity="0.6"/>';
+  }
+
+  function birdFace() {
+    return '' +
+      '<ellipse cx="29" cy="45" rx="12" ry="14" fill="#1e7a4a"/>' +
+      '<circle cx="29" cy="24" r="9" fill="#1e7a4a"/>' +
+      '<polygon points="29,15 25,7 33,7" fill="#c0392b"/>' +
+      '<circle cx="32" cy="22" r="2.1" fill="#ffffff"/>' +
+      '<circle cx="32.6" cy="22" r="1.1" fill="#10202e"/>' +
+      '<path d="M18 44 Q29 35 40 44 Q29 55 18 44 Z" fill="#c0392b"/>' +
+      '<path d="M22 57 L16 71 M29 60 L29 74 M36 57 L42 71" stroke="#1e7a4a" stroke-width="3" stroke-linecap="round"/>';
+  }
+
+  function dotFace(n) {
+    const pos = DOT_POS[n], r = DOT_R[n];
+    let s = '';
+    for (let i = 0; i < pos.length; i++) {
+      const x = pos[i][0], y = pos[i][1];
+      const c = DOT_COLORS[i % 3];
+      s += '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="' + c + '"/>' +
+           '<circle cx="' + x + '" cy="' + y + '" r="' + (r * 0.58) + '" fill="#ffffff" opacity="0.2"/>' +
+           '<circle cx="' + (x - r * 0.3) + '" cy="' + (y - r * 0.3) + '" r="' + (r * 0.22) + '" fill="#ffffff" opacity="0.65"/>';
+    }
+    return s;
+  }
+
+  function bamFace(n) {
+    if (n === 1) return birdFace();
+    const pos = BAMBOO_POS[n];
+    let s = '';
+    for (let i = 0; i < pos.length; i++) {
+      const c = (i % 2 === 0) ? '#1e7a4a' : '#c0392b';
+      s += stick(pos[i][0], pos[i][1], pos[i][2], c);
+    }
+    return s;
+  }
+
+  function chrFace(n) {
+    return '<text x="29" y="34" text-anchor="middle" font-size="29" font-weight="600" font-family="' + CJK +
+           '" fill="#1a4a8a">' + CHR_NUM[n] + '</text>' +
+           '<text x="29" y="68" text-anchor="middle" font-size="25" font-weight="600" font-family="' + CJK +
+           '" fill="#b3261e">萬</text>';
+  }
+
+  function windFace(i) {
+    return '<text x="29" y="54" text-anchor="middle" font-size="40" font-weight="600" font-family="' + CJK +
+           '" fill="#1a4a8a">' + WINDS[i] + '</text>';
+  }
+
+  function dragFace(i) {
+    if (i === 0) {
+      return '<text x="29" y="54" text-anchor="middle" font-size="40" font-weight="600" font-family="' + CJK +
+             '" fill="#b3261e">中</text>';
+    }
+    if (i === 1) {
+      return '<text x="29" y="54" text-anchor="middle" font-size="40" font-weight="600" font-family="' + CJK +
+             '" fill="#1e7a4a">發</text>';
+    }
+    return '<rect x="10" y="14" width="38" height="50" rx="3" fill="none" stroke="#1a4a8a" stroke-width="3"/>' +
+           '<rect x="16" y="20" width="26" height="38" rx="2" fill="none" stroke="#1a4a8a" stroke-width="1.5"/>';
+  }
+
+  function flowerFace(i) {
+    return '<text x="29" y="47" text-anchor="middle" font-size="34" font-weight="600" font-family="' + CJK +
+           '" fill="#1e7a4a">' + FLOWERS[i] + '</text>' +
+           '<text x="29" y="69" text-anchor="middle" font-size="13" font-weight="600" font-family="' + CJK +
+           '" fill="#7aa88c">花</text>';
+  }
+
+  function seasonFace(i) {
+    return '<text x="29" y="47" text-anchor="middle" font-size="34" font-weight="600" font-family="' + CJK +
+           '" fill="#c0392b">' + SEASONS[i] + '</text>' +
+           '<text x="29" y="69" text-anchor="middle" font-size="13" font-weight="600" font-family="' + CJK +
+           '" fill="#c98a80">季</text>';
+  }
+
+  function faceSVG(t) {
+    let inner = '';
+    switch (t.type) {
+      case 'dot':    inner = dotFace(t.face); break;
+      case 'bam':    inner = bamFace(t.face); break;
+      case 'chr':    inner = chrFace(t.face); break;
+      case 'wind':   inner = windFace(t.face); break;
+      case 'drag':   inner = dragFace(t.face); break;
+      case 'flower': inner = flowerFace(t.face); break;
+      case 'season': inner = seasonFace(t.face); break;
+    }
+    return '<svg viewBox="0 0 58 78" xmlns="http://www.w3.org/2000/svg">' + inner + '</svg>';
+  }
+
+  /* =========================================================
+     TILE SET & SOLVABLE ASSIGNMENT
+     ========================================================= */
+  function fullTileSet() {
+    const t = [];
+    for (let v = 1; v <= 9; v++) {
+      for (let k = 0; k < 4; k++) {
+        t.push({ type: 'dot', face: v });
+        t.push({ type: 'bam', face: v });
+        t.push({ type: 'chr', face: v });
+      }
+    }
+    for (let i = 0; i < 4; i++) for (let k = 0; k < 4; k++) t.push({ type: 'wind', face: i });
+    for (let i = 0; i < 3; i++) for (let k = 0; k < 4; k++) t.push({ type: 'drag', face: i });
+    for (let i = 0; i < 4; i++) t.push({ type: 'flower', face: i });
+    for (let i = 0; i < 4; i++) t.push({ type: 'season', face: i });
+    return t;
+  }
+
+  function shuffleArr(a) {
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+    }
+    return a;
+  }
+
+  function makePairs(tiles) {
+    const buckets = {};
+    for (let i = 0; i < tiles.length; i++) {
+      const t = tiles[i];
+      const key = (t.type === 'flower' || t.type === 'season') ? t.type : (t.type + ':' + t.face);
+      (buckets[key] = buckets[key] || []).push(t);
+    }
+    const pairs = [];
+    for (const key in buckets) {
+      const arr = shuffleArr(buckets[key].slice());
+      for (let i = 0; i + 1 < arr.length; i += 2) {
+        pairs.push({ type: arr[i].type, faces: [arr[i].face, arr[i + 1].face] });
+      }
+    }
+    return shuffleArr(pairs);
+  }
+
+  // Helper to check if two tiles are a valid match
+  function isMatch(a, b) {
+    if (a.type !== b.type) return false;
+    if (a.type === 'flower' || a.type === 'season') return true;
+    return a.face === b.face;
+  }
+
+  function getBlockType(a, b) {
+    if (a.z > b.z && Math.abs(a.x - b.x) < 2 && Math.abs(a.y - b.y) < 2) return 'top';
+    if (a.z === b.z && a.y === b.y && a.x === b.x - 2) return 'left';
+    if (a.z === b.z && a.y === b.y && a.x === b.x + 2) return 'right';
+    return null;
+  }
+
+  function assignSolvable(positions, pairs) {
+    const n = positions.length;
+    if (pairs.length * 2 !== n) return null;
+
+    const blocks = [];       // blocks[i] = array of {id, type} tile i blocks
+    const blockedBy = [];    // blockedBy[i] = array of {id, type} blocking tile i
+    for (let i = 0; i < n; i++) { blocks.push([]); blockedBy.push([]); }
+
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const typeIJ = getBlockType(positions[i], positions[j]);
+        if (typeIJ) {
+          blocks[i].push({ id: j, type: typeIJ });
+          blockedBy[j].push({ id: i, type: typeIJ });
+        } else {
+          const typeJI = getBlockType(positions[j], positions[i]);
+          if (typeJI) {
+            blocks[j].push({ id: i, type: typeJI });
+            blockedBy[i].push({ id: j, type: typeJI });
+          }
+        }
+      }
+    }
+
+    function isFree(i) {
+      let top = false, left = false, right = false;
+      for (const b of blockedBy[i]) {
+        if (b.type === 'top') top = true;
+        if (b.type === 'left') left = true;
+        if (b.type === 'right') right = true;
+      }
+      return !top && !(left && right);
+    }
+
+    const removed = new Array(n).fill(false);
+    const result = new Array(n);
+    const queue = shuffleArr(pairs.slice());
+    let left = n, qi = 0;
+
+    while (left > 0) {
+      const free = [];
+      for (let i = 0; i < n; i++) {
+        if (!removed[i] && isFree(i)) free.push(i);
+      }
+      if (free.length < 2) return null;
+      shuffleArr(free);
+      const a = free[0], b = free[1];
+      const p = queue[qi++];
+      if (!p) return null;
+      result[a] = { type: p.type, face: p.faces[0] };
+      result[b] = { type: p.type, face: p.faces[1] };
+      removed[a] = true; removed[b] = true;
+      left -= 2;
+
+      for (const item of blocks[a]) {
+        blockedBy[item.id] = blockedBy[item.id].filter(x => x.id !== a);
+      }
+      for (const item of blocks[b]) {
+        blockedBy[item.id] = blockedBy[item.id].filter(x => x.id !== b);
+      }
+    }
+    return result;
+  }
+
+  /* =========================================================
+     STATE
+     ========================================================= */
+  const state = {
+    tiles: [],
+    selected: null,
+    history: [],
+    matches: 0,
+    startTime: 0,
+    timerId: null,
+    over: false
+  };
+
+  const boardEl = document.getElementById('board');
+  const toastEl = document.getElementById('toast');
+  const overlayEl = document.getElementById('overlay');
+  const statTiles = document.getElementById('stat-tiles');
+  const statTime = document.getElementById('stat-time');
+  const statMatches = document.getElementById('stat-matches');
+
+  /* =========================================================
+     RENDERING
+     ========================================================= */
+  function createTileEl(t) {
+    const el = document.createElement('div');
+    el.className = 'tile';
+    el.style.left = (t.x * HALF_W - t.z * 5 + 4) + 'px';
+    el.style.top = (t.y * HALF_H - t.z * 5 + 4) + 'px';
+    el.style.zIndex = String(t.z * 10000 + t.y * 100 + t.x * 2);
+    el.innerHTML = faceSVG(t);
+    el.addEventListener('pointerdown', function (e) {
+      e.preventDefault();
+      onTileClick(t);
+    });
+    t.el = el;
+    return el;
+  }
+
+  function fitBoard() {
+    const wrap = document.querySelector('.board-wrap');
+    const aw = wrap.clientWidth - 26;
+    const ah = wrap.clientHeight - 26;
+    let s = Math.min(aw / BOARD_W, ah / BOARD_H);
+    s = Math.min(s, 1.35);
+    boardEl.style.transform = 'translate(-50%, -50%) scale(' + s + ')';
+  }
+
+  /* =========================================================
+     GAME LOGIC
+     ========================================================= */
+  function isTileFree(t) {
+    let blockedLeft = false;
+    let blockedRight = false;
+    for (let i = 0; i < state.tiles.length; i++) {
+      const o = state.tiles[i];
+      if (o === t || o.removed) continue;
+      
+      // Covered from above
+      if (o.z > t.z && Math.abs(o.x - t.x) < 2 && Math.abs(o.y - t.y) < 2) return false;
+      
+      // Left neighbor
+      if (o.z === t.z && o.y === t.y && o.x === t.x - 2) blockedLeft = true;
+      
+      // Right neighbor
+      if (o.z === t.z && o.y === t.y && o.x === t.x + 2) blockedRight = true;
+    }
+    return !(blockedLeft && blockedRight);
+  }
+
+  function freeTiles() {
+    const out = [];
+    for (let i = 0; i < state.tiles.length; i++) {
+      const t = state.tiles[i];
+      if (!t.removed && isTileFree(t)) out.push(t);
+    }
+    return out;
+  }
+
+  function hasMoves() {
+    const free = freeTiles();
+    for (let i = 0; i < free.length; i++) {
+      for (let j = i + 1; j < free.length; j++) {
+        if (isMatch(free[i], free[j])) return true;
+      }
+    }
+    return false;
+  }
+
+  function updateStats() {
+    let left = 0;
+    for (let i = 0; i < state.tiles.length; i++) if (!state.tiles[i].removed) left++;
+    statTiles.textContent = left;
+    statMatches.textContent = state.matches;
+    document.getElementById('btn-undo').disabled = state.history.length === 0;
+  }
+
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { toastEl.classList.remove('show'); }, 2200);
+  }
+
+  function shake(t) {
+    if (!t.el) return;
+    t.el.classList.remove('shake');
+    void t.el.offsetWidth;
+    t.el.classList.add('shake');
+    setTimeout(function () { if (t.el) t.el.classList.remove('shake'); }, 300);
+  }
+
+  function onTileClick(t) {
+    ensureAudio();
+    if (state.over || t.removed) return;
+
+    if (!isTileFree(t)) {
+      SFX.error();
+      shake(t);
+      return;
+    }
+
+    if (state.selected === t) {
+      t.el.classList.remove('sel');
+      state.selected = null;
+      SFX.select();
+      return;
+    }
+
+    if (!state.selected) {
+      state.selected = t;
+      t.el.classList.add('sel');
+      SFX.select();
+      return;
+    }
+
+    const a = state.selected;
+    if (isMatch(a, t)) {
+      a.el.classList.remove('sel');
+      state.selected = null;
+      removePair(a, t);
+    } else {
+      a.el.classList.remove('sel');
+      state.selected = t;
+      t.el.classList.add('sel');
+      SFX.select();
+    }
+  }
+
+  function removePair(a, b) {
+    a.removed = true;
+    b.removed = true;
+    state.history.push([a, b]);
+    state.matches++;
+    updateStats();
+    SFX.match();
+
+    [a, b].forEach(function (t) {
+      t.el.classList.add('gone');
+      (function (tile) {
+        setTimeout(function () {
+          if (tile.el && tile.el.parentNode) tile.el.parentNode.removeChild(tile.el);
+        }, 400);
+      })(t);
+    });
+
+    let left = 0;
+    for (let i = 0; i < state.tiles.length; i++) if (!state.tiles[i].removed) left++;
+
+    if (left === 0) {
+      setTimeout(winGame, 450);
+      return;
+    }
+
+    setTimeout(function () {
+      if (state.over) return;
+      if (!hasMoves()) {
+        toast('No moves left — shuffling…');
+        setTimeout(function () { doShuffle(true); }, 750);
+      }
+    }, 480);
+  }
+
+  function doShuffle(auto) {
+    if (state.over) return;
+    const remaining = [];
+    for (let i = 0; i < state.tiles.length; i++) if (!state.tiles[i].removed) remaining.push(state.tiles[i]);
+    if (remaining.length < 2) return;
+
+    if (state.selected) {
+      if (state.selected.el) state.selected.el.classList.remove('sel');
+      state.selected = null;
+    }
+
+    const positions = remaining.map(function (t) { return { x: t.x, y: t.y, z: t.z }; });
+    const sourceTiles = remaining.map(function (t) { return { type: t.type, face: t.face }; });
+
+    let assignment = null;
+    for (let attempt = 0; attempt < 80 && !assignment; attempt++) {
+      assignment = assignSolvable(positions, makePairs(sourceTiles));
+    }
+    if (!assignment) { toast('Could not shuffle — try New Game'); return; }
+
+    SFX.shuffle();
+
+    for (let i = 0; i < remaining.length; i++) {
+      const t = remaining[i];
+      t.type = assignment[i].type;
+      t.face = assignment[i].face;
+      if (t.el) {
+        t.el.innerHTML = faceSVG(t);
+        t.el.classList.remove('pulse');
+        void t.el.offsetWidth;
+        t.el.classList.add('pulse');
+        (function (tile) {
+          setTimeout(function () { if (tile.el) tile.el.classList.remove('pulse'); }, 420);
+        })(t);
+      }
+    }
+
+    if (!auto) toast('Tiles shuffled');
+    updateStats();
+
+    setTimeout(function () {
+      if (!state.over && !hasMoves()) toast('Still no moves — try again');
+    }, 500);
+  }
+
+  function doHint() {
+    if (state.over) return;
+    ensureAudio();
+    const free = freeTiles();
+    for (let i = 0; i < free.length; i++) {
+      for (let j = i + 1; j < free.length; j++) {
+        if (isMatch(free[i], free[j])) {
+          SFX.hint();
+          [free[i], free[j]].forEach(function (t) {
+            t.el.classList.add('hint');
+            (function (tile) {
+              setTimeout(function () { if (tile.el) tile.el.classList.remove('hint'); }, 1700);
+            })(t);
+          });
+          return;
+        }
+      }
+    }
+    toast('No matching pair available — try Shuffle');
+  }
+
+  function doUndo() {
+    if (state.over) return;
+    const last = state.history.pop();
+    if (!last) { toast('Nothing to undo'); return; }
+    ensureAudio();
+    SFX.undo();
+
+    state.matches--;
+    if (state.selected) {
+      if (state.selected.el) state.selected.el.classList.remove('sel');
+      state.selected = null;
+    }
+
+    last.forEach(function (t) {
+      t.removed = false;
+      if (t.el && t.el.parentNode) t.el.parentNode.removeChild(t.el);
+      t.el = createTileEl(t);
+      boardEl.appendChild(t.el);
+      t.el.classList.add('appear');
+      (function (tile) {
+        setTimeout(function () { if (tile.el) tile.el.classList.remove('appear'); }, 380);
+      })(t);
+    });
+    updateStats();
+  }
+
+  function winGame() {
+    state.over = true;
+    clearInterval(state.timerId);
+    SFX.win();
+    const s = Math.floor((Date.now() - state.startTime) / 1000);
+    document.getElementById('win-msg').textContent =
+      'Cleared in ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') + ' with ' + state.matches + ' matches.';
+    overlayEl.classList.add('show');
+  }
+
+  function startTimer() {
+    clearInterval(state.timerId);
+    state.startTime = Date.now();
+    statTime.textContent = '0:00';
+    state.timerId = setInterval(function () {
+      const s = Math.floor((Date.now() - state.startTime) / 1000);
+      statTime.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+    }, 500);
+  }
+
+  /* =========================================================
+     NEW GAME
+     ========================================================= */
+  function newGame() {
+    ensureAudio();
+    overlayEl.classList.remove('show');
+    boardEl.innerHTML = '';
+    state.tiles = [];
+    state.selected = null;
+    state.history = [];
+    state.matches = 0;
+    state.over = false;
+
+    const positions = buildLayout();
+    const sourceTiles = fullTileSet();
+
+    let assignment = null;
+    for (let attempt = 0; attempt < 120 && !assignment; attempt++) {
+      assignment = assignSolvable(positions, makePairs(sourceTiles));
+    }
+
+    if (!assignment) {
+      const shuffled = shuffleArr(sourceTiles.slice());
+      assignment = positions.map(function (_, i) {
+        return { type: shuffled[i].type, face: shuffled[i].face };
+      });
+    }
+
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < positions.length; i++) {
+      const p = positions[i];
+      const tile = {
+        id: i,
+        x: p.x, y: p.y, z: p.z,
+        type: assignment[i].type,
+        face: assignment[i].face,
+        removed: false,
+        el: null
+      };
+      state.tiles.push(tile);
+      frag.appendChild(createTileEl(tile));
+    }
+    boardEl.appendChild(frag);
+
+    updateStats();
+    fitBoard();
+    startTimer();
+  }
+
+  /* =========================================================
+     EVENTS
+     ========================================================= */
+  document.getElementById('btn-new').addEventListener('click', function () { ensureAudio(); newGame(); });
+  document.getElementById('btn-shuffle').addEventListener('click', function () { ensureAudio(); doShuffle(false); });
+  document.getElementById('btn-hint').addEventListener('click', doHint);
+  document.getElementById('btn-undo').addEventListener('click', doUndo);
+  document.getElementById('btn-again').addEventListener('click', function () { ensureAudio(); newGame(); });
+
+  document.getElementById('btn-sound').addEventListener('click', function () {
+    soundOn = !soundOn;
+    this.textContent = soundOn ? '🔊' : '🔇';
+    if (soundOn) { ensureAudio(); SFX.select(); }
+  });
+
+  window.addEventListener('resize', fitBoard);
+  window.addEventListener('orientationchange', function () { setTimeout(fitBoard, 120); });
+  document.addEventListener('pointerdown', function () { ensureAudio(); }, { once: true });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'h' || e.key === 'H') doHint();
+    else if (e.key === 'u' || e.key === 'U') doUndo();
+    else if (e.key === 's' || e.key === 'S') doShuffle(false);
+    else if (e.key === 'n' || e.key === 'N') newGame();
+  });
+
+  /* =========================================================
+     BOOT
+     ========================================================= */
+  newGame();
+  setTimeout(fitBoard, 30);
+
+})();
+</script>
+</body>
+</html>

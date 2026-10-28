@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Minesweeper</title>
+<style>
+  :root {
+    --cell: 30px;
+    --bg-0: #080d16;
+    --bg-1: #0f172a;
+    --bg-2: #1e293b;
+    --line: rgba(148, 163, 184, .18);
+    --txt: #e2e8f0;
+    --muted: #94a3b8;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { height: 100%; }
+
+  body {
+    margin: 0;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: radial-gradient(circle at 50% -10%, #1e293b 0%, #0f172a 45%, #080d16 100%) fixed;
+    color: var(--txt);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 22px 16px 48px;
+    min-height: 100%;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    overflow-x: hidden;
+  }
+
+  /* ---------- Header ---------- */
+  header { text-align: center; margin-bottom: 18px; }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(24px, 5vw, 34px);
+    font-weight: 800;
+    letter-spacing: -.5px;
+    background: linear-gradient(180deg, #ffffff, #94a3b8);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: 0 6px 24px rgba(59, 130, 246, .25);
+  }
+
+  .tagline {
+    margin: 6px 0 0;
+    font-size: 12.5px;
+    color: var(--muted);
+    letter-spacing: .2px;
+  }
+
+  /* ---------- Difficulty picker ---------- */
+  .diffs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 16px;
+  }
+
+  .diff {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 104px;
+    padding: 9px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: rgba(148, 163, 184, .09);
+    color: #cbd5e1;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background .15s, border-color .15s, transform .1s, box-shadow .15s;
+  }
+
+  .diff:hover { background: rgba(148, 163, 184, .18); }
+  .diff:active { transform: translateY(1px); }
+
+  .diff .d-name { font-size: 13px; font-weight: 700; }
+  .diff .d-sub  { font-size: 10.5px; color: var(--muted); letter-spacing: .2px; }
+
+  .diff.active {
+    background: linear-gradient(180deg, #3b82f6, #2563eb);
+    border-color: #60a5fa;
+    color: #fff;
+    box-shadow: 0 8px 22px -10px #3b82f6;
+  }
+  .diff.active .d-sub { color: rgba(255, 255, 255, .8); }
+
+  /* ---------- Game panel ---------- */
+  .game {
+    width: fit-content;
+    max-width: 100%;
+    padding: 12px;
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(51, 65, 85, .55), rgba(15, 23, 42, .75));
+    border: 1px solid var(--line);
+    box-shadow:
+      0 24px 60px -24px rgba(0, 0, 0, .9),
+      inset 0 1px 0 rgba(255, 255, 255, .06);
+    backdrop-filter: blur(8px);
+  }
+
+  .hud {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 12px;
+  }
+
+  .counter {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    font-variant-numeric: tabular-nums;
+    min-width: 72px;
+    text-align: center;
+    padding: 5px 10px;
+    border-radius: 8px;
+    background: #05080d;
+    color: #ff4d4d;
+    text-shadow: 0 0 10px rgba(255, 60, 60, .75);
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, .9), 0 1px 0 rgba(255, 255, 255, .05);
+  }
+
+  .face {
+    width: 46px;
+    height: 46px;
+    flex: 0 0 auto;
+    border: none;
+    border-radius: 50%;
+    padding: 0;
+    font-size: 23px;
+    line-height: 1;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    background: linear-gradient(180deg, #fbbf24, #f59e0b);
+    box-shadow: 0 4px 0 #b45309, 0 8px 18px -6px rgba(0, 0, 0, .7);
+    transition: transform .06s, box-shadow .06s, filter .15s;
+  }
+  .face:hover { filter: brightness(1.07); }
+  .face:active {
+    transform: translateY(3px);
+    box-shadow: 0 1px 0 #b45309, 0 4px 10px -6px rgba(0, 0, 0, .7);
+  }
+
+  .board-wrap {
+    max-width: 100%;
+    overflow: auto;
+    border-radius: 8px;
+    scrollbar-width: thin;
+    scrollbar-color: #475569 transparent;
+  }
+  .board-wrap::-webkit-scrollbar { height: 8px; width: 8px; }
+  .board-wrap::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+
+  .board {
+    display: grid;
+    grid-template-columns: repeat(var(--cols, 9), var(--cell, 30px));
+    grid-auto-rows: var(--cell, 30px);
+    gap: 1px;
+    padding: 1px;
+    background: #05080d;
+    border-radius: 8px;
+    touch-action: manipulation;
+  }
+
+  /* ---------- Cells ---------- */
+  .cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: calc(var(--cell, 30px) * .58);
+    font-weight: 800;
+    line-height: 1;
+    border-radius: 3px;
+    color: transparent;
+    cursor: pointer;
+    background-image: linear-gradient(180deg, #5b6d88, #44526a);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18), inset 0 -1px 0 rgba(0, 0, 0, .3);
+    transition: background-image .08s, transform .05s;
+  }
+
+  .cell:hover:not(.revealed) { background-image: linear-gradient(180deg, #6d81a1, #50607c); }
+  .cell:active:not(.revealed) { transform: scale(.94); }
+
+  .cell.revealed {
+    background-image: none;
+    background: #1b2534;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .035);
+    cursor: default;
+    transform: none;
+  }
+  .cell.revealed:hover { background: #1b2534; }
+
+  .cell.n1 { color: #60a5fa; }
+  .cell.n2 { color: #4ade80; }
+  .cell.n3 { color: #f87171; }
+  .cell.n4 { color: #c084fc; }
+  .cell.n5 { color: #fbbf24; }
+  .cell.n6 { color: #22d3ee; }
+  .cell.n7 { color: #f472b6; }
+  .cell.n8 { color: #cbd5e1; }
+
+  .cell.mine {
+    color: #fff;
+    font-size: calc(var(--cell, 30px) * .52);
+    background: #1b2534;
+  }
+
+  .cell.exploded {
+    background: #dc2626 !important;
+    box-shadow: 0 0 0 2px #fca5a5 inset, 0 0 16px rgba(220, 38, 38, .8);
+    animation: pop .25s ease-out;
+  }
+
+  @keyframes pop {
+    from { transform: scale(.7); }
+    to   { transform: scale(1); }
+  }
+
+  .cell.flagged { color: #fff; }
+  .cell.wrong { color: #f87171; background: #1b2534; }
+
+  /* ---------- Bottom bar ---------- */
+  .bottom {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+  }
+
+  .flag-toggle, .best {
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: rgba(148, 163, 184, .09);
+    color: #cbd5e1;
+  }
+
+  .flag-toggle { cursor: pointer; transition: all .15s; }
+  .flag-toggle:hover { background: rgba(148, 163, 184, .2); }
+  .flag-toggle.on {
+    background: linear-gradient(180deg, #10b981, #059669);
+    border-color: #34d399;
+    color: #fff;
+    box-shadow: 0 6px 18px -8px #10b981;
+  }
+
+  .best { color: var(--muted); cursor: default; }
+
+  .status {
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--muted);
+    text-align: center;
+    min-height: 18px;
+    transition: color .2s;
+  }
+  .status.win  { color: #4ade80; font-weight: 700; }
+  .status.lose { color: #f87171; font-weight: 700; }
+
+  @media (max-width: 520px) {
+    body { padding: 14px 8px 40px; }
+    .tagline { display: none; }
+    .diff { min-width: 92px; padding: 8px 12px; }
+    .counter { font-size: 18px; min-width: 62px; }
+    .face { width: 40px; height: 40px; font-size: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Minesweeper</h1>
+  <p class="tagline">Left-click to dig · Right-click to flag · Click a number to chord</p>
+</header>
+
+<div class="diffs" id="diffs">
+  <button class="diff" data-diff="beginner">
+    <span class="d-name">Beginner</span><span class="d-sub">9 × 9 · 10</span>
+  </button>
+  <button class="diff" data-diff="intermediate">
+    <span class="d-name">Intermediate</span><span class="d-sub">16 × 16 · 40</span>
+  </button>
+  <button class="diff" data-diff="expert">
+    <span class="d-name">Expert</span><span class="d-sub">30 × 16 · 99</span>
+  </button>
+</div>
+
+<div class="game">
+  <div class="hud">
+    <div class="counter" id="mineCounter">010</div>
+    <button class="face" id="face" title="New game" aria-label="New game">🙂</button>
+    <div class="counter" id="timer">000</div>
+  </div>
+  <div class="board-wrap">
+    <div class="board" id="board"></div>
+  </div>
+</div>
+
+<div class="bottom">
+  <button class="flag-toggle" id="flagToggle">🚩 Flag mode: OFF</button>
+  <div class="best" id="bestLine">Best: —</div>
+</div>
+
+<div class="status" id="statusLine">Pick a difficulty and start digging.</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* =========================================================
+     Configuration
+     ========================================================= */
+  const DIFFS = {
+    beginner:     { cols: 9,  rows: 9,  mines: 10, label: 'Beginner' },
+    intermediate: { cols: 16, rows: 16, mines: 40, label: 'Intermediate' },
+    expert:       { cols: 30, rows: 16, mines: 99, label: 'Expert' },
+  };
+
+  const SAVE_KEY = 'minesweeper.saves.v1';
+  const BEST_KEY = 'minesweeper.best.v1';
+  const PREF_KEY = 'minesweeper.prefs.v1';
+
+  /* =========================================================
+     Storage helpers (all wrapped so private mode never breaks)
+     ========================================================= */
+  function loadJSON(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return fallback;
+      const val = JSON.parse(raw);
+      return val == null ? fallback : val;
+    } catch (e) {
+      return fallback;
+    }
+  }
+
+  function saveJSON(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* ignore */ }
+  }
+
+  /* =========================================================
+     DOM
+     ========================================================= */
+  const boardEl   = document.getElementById('board');
+  const mineEl    = document.getElementById('mineCounter');
+  const timerEl   = document.getElementById('timer');
+  const faceEl    = document.getElementById('face');
+  const diffBtns  = Array.from(document.querySelectorAll('.diff'));
+  const bestEl    = document.getElementById('bestLine');
+  const flagBtn   = document.getElementById('flagToggle');
+  const statusEl  = document.getElementById('statusLine');
+
+  /* =========================================================
+     Runtime state
+     ========================================================= */
+  let game = null;          // current game object
+  let els = [];             // cell DOM elements, indexed like game.cells
+  let timerId = null;
+  let flagMode = false;
+  let pressing = false;
+  let suppressClick = false;
+  let longPressTimer = null;
+  let currentDiff = 'beginner';
+
+  /* =========================================================
+     Game construction / (de)serialization
+     ========================================================= */
+  function newGame(diff) {
+    const d = DIFFS[diff];
+    currentDiff = diff;
+    game = {
+      diff,
+      cols: d.cols,
+      rows: d.rows,
+      mines: d.mines,
+      cells: Array.from({ length: d.cols * d.rows }, () => ({
+        mine: false, adj: 0, revealed: false, flagged: false
+      })),
+      status: 'ready',   // ready | playing | won | lost
+      elapsed: 0,
+      flags: 0,
+      revealedCount: 0,
+      exploded: -1
+    };
+    stopTimer();
+    buildBoard();
+    updateHUD();
+    setStatus('Good luck!', '');
+    save();
+  }
+
+  // Compact cell encoding:  bit0 = mine, bits1-4 = adj, bit5 = revealed, bit6 = flagged
+  function serialize() {
+    return {
+      v: 1,
+      diff: game.diff,
+      cols: game.cols,
+      rows: game.rows,
+      mines: game.mines,
+      status: game.status,
+      elapsed: game.elapsed,
+      flags: game.flags,
+      revealedCount: game.revealedCount,
+      exploded: game.exploded,
+      cells: game.cells.map(c =>
+        (c.mine ? 1 : 0) | (c.adj << 1) | (c.revealed ? 32 : 0) | (c.flagged ? 64 : 0)
+      )
+    };
+  }
+
+  function restore(s) {
+    if (!s || typeof s !== 'object') return false;
+    const d = DIFFS[s.diff];
+    if (!d) return false;
+    if (s.cols !== d.cols || s.rows !== d.rows || s.mines !== d.mines) return false;
+    if (!Array.isArray(s.cells) || s.cells.length !== d.cols * d.rows) return false;
+
+    game = {
+      diff: s.diff,
+      cols: s.cols,
+      rows: s.rows,
+      mines: s.mines,
+      cells: s.cells.map(v => ({
+        mine:     !!(v & 1),
+        adj:      (v >> 1) & 15,
+        revealed: !!(v & 32),
+        flagged:  !!(v & 64)
+      })),
+      status: ['ready', 'playing', 'won', 'lost'].indexOf(s.status) >= 0 ? s.status : 'ready',
+      elapsed: s.elapsed | 0,
+      flags: s.flags | 0,
+      revealedCount: s.revealedCount | 0,
+      exploded: typeof s.exploded === 'number' ? s.exploded : -1
+    };
+    currentDiff = s.diff;
+    return true;
+  }
+
+  function save() {
+    if (!game) return;
+    const saves = loadJSON(SAVE_KEY, {});
+    saves[game.diff] = serialize();
+    saveJSON(SAVE_KEY, saves);
+  }
+
+  function loadOrNew(diff) {
+    const saves = loadJSON(SAVE_KEY, {});
+    stopTimer();
+    if (restore(saves[diff])) {
+      buildBoard();
+      if (game.status === 'playing') startTimer();
+      if (game.status === 'won')  setStatus('Solved! 🎉', 'win');
+      else if (game.status === 'lost') setStatus('Boom! Hit the face to retry.', 'lose');
+      else setStatus('Resumed your saved game.', '');
+      updateHUD();
+    } else {
+      newGame(diff);
+    }
+    syncDiffButtons();
+    updateBestLine();
+  }
+
+  /* =========================================================
+     Board rendering
+     ========================================================= */
+  function buildBoard() {
+    boardEl.style.setProperty('--cols', game.cols);
+    boardEl.innerHTML = '';
+    els = new Array(game.cells.length);
+
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < game.cells.length; i++) {
+      const el = document.createElement('div');
+      el.className = 'cell';
+      el.dataset.i = i;
+      els[i] = el;
+      frag.appendChild(el);
+    }
+    boardEl.appendChild(frag);
+
+    fitBoard();
+    paintAll();
+  }
+
+  function paint(i) {
+    const c = game.cells[i];
+    const el = els[i];
+    if (!el) return;
+
+    const lost = game.status === 'lost';
+    let cls = 'cell';
+    let txt = '';
+
+    if (c.revealed) {
+      cls += ' revealed';
+      if (c.mine) {
+        cls += ' mine';
+        txt = '💣';
+        if (i === game.exploded) cls += ' exploded';
+      } else if (c.adj > 0) {
+        cls += ' n' + c.adj;
+        txt = String(c.adj);
+      }
+    } else if (lost && c.flagged && !c.mine) {
+      cls += ' revealed wrong';
+      txt = '❌';
+    } else if (c.flagged) {
+      cls += ' flagged';
+      txt = '🚩';
+    } else if (lost && c.mine) {
+      cls += ' revealed mine';
+      txt = '💣';
+    }
+
+    el.className = cls;
+    el.textContent = txt;
+  }
+
+  function paintAll() {
+    for (let i = 0; i < game.cells.length; i++) paint(i);
+  }
+
+  function fitBoard() {
+    if (!game) return;
+    const gap = 1;
+    const availW = Math.min(window.innerWidth - 58, 1260);
+    const availH = Math.max(200, window.innerHeight - 330);
+
+    const sizeW = Math.floor((availW - (game.cols - 1) * gap) / game.cols);
+    const sizeH = Math.floor((availH - (game.rows - 1) * gap) / game.rows);
+
+    let size = Math.min(sizeW, sizeH);
+    size = Math.max(15, Math.min(38, size));
+    boardEl.style.setProperty('--cell', size + 'px');
+  }
+
+  /* =========================================================
+     HUD
+     ========================================================= */
+  function fmt(n) {
+    if (n < 0) return '-' + String(Math.min(99, -n)).padStart(2, '0');
+    return String(Math.min(999, n)).padStart(3, '0');
+  }
+
+  function updateHUD() {
+    mineEl.textContent = fmt(game.mines - game.flags);
+    timerEl.textContent = fmt(game.elapsed);
+    updateFace();
+  }
+
+  function updateFace() {
+    let f = '🙂';
+    if (game.status === 'won') f = '😎';
+    else if (game.status === 'lost') f = '😵';
+    else if (pressing) f = '😮';
+    faceEl.textContent = f;
+  }
+
+  function setStatus(msg, kind) {
+    statusEl.textContent = msg;
+    statusEl.className = 'status' + (kind ? ' ' + kind : '');
+  }
+
+  function updateBestLine() {
+    const best = loadJSON(BEST_KEY, {});
+    const b = best[currentDiff];
+    const label = DIFFS[currentDiff].label;
+    bestEl.textContent = (typeof b === 'number')
+      ? `🏆 Best ${label}: ${b}s`
+      : `🏆 Best ${label}: —`;
+  }
+
+  function syncDiffButtons() {
+    diffBtns.forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.diff === currentDiff);
+    });
+  }
+
+  function updateFlagToggle() {
+    flagBtn.classList.toggle('on', flagMode);
+    flagBtn.textContent = flagMode ? '🚩 Flag mode: ON' : '🚩 Flag mode: OFF';
+  }
+
+  /* =========================================================
+     Timer
+     ========================================================= */
+  function startTimer() {
+    stopTimer();
+    timerId = setInterval(() => {
+      if (!game || game.status !== 'playing') return;
+      game.elapsed++;
+      timerEl.textContent = fmt(game.elapsed);
+      if (game.elapsed % 5 === 0) save();
+    }, 1000);
+  }
+
+  function stopTimer() {
+    if (timerId !== null) {
+      clearInterval(timerId);
+      timerId = null;
+    }
+  }
+
+  /* =========================================================
+     Board logic
+     ========================================================= */
+  function neighbors(i) {
+    const cols = game.cols, rows = game.rows;
+    const x = i % cols;
+    const y = (i / cols) | 0;
+    const out = [];
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const nx = x + dx, ny = y + dy;
+        if (nx >= 0 && nx < cols && ny >= 0 && ny < rows) out.push(ny * cols + nx);
+      }
+    }
+    return out;
+  }
+
+  // Mines are placed only after the first click, and never on/around it.
+  function placeMines(safeIndex) {
+    const total = game.cols * game.rows;
+    const banned = new Set([safeIndex].concat(neighbors(safeIndex)));
+
+    let pool = [];
+    for (let i = 0; i < total; i++) if (!banned.has(i)) pool.push(i);
+
+    // Safety net for absurd mine densities
+    if (pool.length < game.mines) {
+      pool = [];
+      for (let i = 0; i < total; i++) if (i !== safeIndex) pool.push(i);
+    }
+
+    // Partial Fisher–Yates
+    for (let i = 0; i < game.mines; i++) {
+      const j = i + Math.floor(Math.random() * (pool.length - i));
+      const tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
+      game.cells[pool[i]].mine = true;
+    }
+
+    // Adjacency counts
+    for (let i = 0; i < total; i++) {
+      if (game.cells[i].mine) continue;
+      let n = 0;
+      const nb = neighbors(i);
+      for (let k = 0; k < nb.length; k++) if (game.cells[nb[k]].mine) n++;
+      game.cells[i].adj = n;
+    }
+  }
+
+  function floodReveal(start) {
+    const stack = [start];
+    while (stack.length) {
+      const i = stack.pop();
+      const c = game.cells[i];
+      if (c.revealed || c.flagged || c.mine) continue;
+
+      c.revealed = true;
+      game.revealedCount++;
+      paint(i);
+
+      if (c.adj === 0) {
+        const nb = neighbors(i);
+        for (let k = 0; k < nb.length; k++) {
+          const n = game.cells[nb[k]];
+          if (!n.revealed && !n.flagged) stack.push(nb[k]);
+        }
+      }
+    }
+  }
+
+  function revealCell(i) {
+    const c = game.cells[i];
+    if (c.revealed || c.flagged) return;
+
+    if (game.status === 'ready') {
+      placeMines(i);
+      game.status = 'playing';
+      startTimer();
+      setStatus('Digging…', '');
+    }
+    if (game.status !== 'playing') return;
+
+    if (c.mine) {
+      lose(i);
+      return;
+    }
+
+    floodReveal(i);
+    checkWin();
+    updateHUD();
+    save();
+  }
+
+  function chord(i) {
+    const c = game.cells[i];
+    if (!c.revealed || c.adj === 0) return;
+
+    const nb = neighbors(i);
+    let flagged = 0;
+    for (let k = 0; k < nb.length; k++) if (game.cells[nb[k]].flagged) flagged++;
+    if (flagged !== c.adj) return;
+
+    for (let k = 0; k < nb.length; k++) {
+      const idx = nb[k];
+      const n = game.cells[idx];
+      if (n.flagged || n.revealed) continue;
+      if (n.mine) { lose(idx); return; }
+      floodReveal(idx);
+    }
+
+    checkWin();
+    paintAll();
+    updateHUD();
+    save();
+  }
+
+  function toggleFlag(i) {
+    if (!game || game.status === 'won' || game.status === 'lost') return;
+    const c = game.cells[i];
+    if (c.revealed) return;
+
+    c.flagged = !c.flagged;
+    game.flags += c.flagged ? 1 : -1;
+    paint(i);
+    updateHUD();
+    save();
+  }
+
+  function lose(i) {
+    game.status = 'lost';
+    game.exploded = i;
+    game.cells[i].revealed = true;
+    stopTimer();
+    paintAll();
+    updateHUD();
+    setStatus('💥 Boom! Click the face to try again.', 'lose');
+    save();
+  }
+
+  function checkWin() {
+    const total = game.cols * game.rows;
+    if (game.revealedCount !== total - game.mines) return;
+
+    game.status = 'won';
+    stopTimer();
+
+    // Auto-flag remaining mines
+    for (let i = 0; i < game.cells.length; i++) {
+      const c = game.cells[i];
+      if (c.mine && !c.flagged) { c.flagged = true; game.flags++; }
+    }
+
+    recordBest();
+    paintAll();
+    updateHUD();
+    setStatus(`🎉 Cleared in ${game.elapsed}s!`, 'win');
+    save();
+  }
+
+  function recordBest() {
+    const best = loadJSON(BEST_KEY, {});
+    const prev = best[game.diff];
+    if (typeof prev !== 'number' || game.elapsed < prev) {
+      best[game.diff] = game.elapsed;
+      saveJSON(BEST_KEY, best);
+    }
+    updateBestLine();
+  }
+
+  /* =========================================================
+     Input handling
+     ========================================================= */
+  function handlePrimary(i) {
+    if (!game || game.status === 'won' || game.status === 'lost') return;
+    const c = game.cells[i];
+
+    if (flagMode) { toggleFlag(i); return; }
+    if (c.revealed) { chord(i); return; }
+    if (c.flagged) return;
+    revealCell(i);
+  }
+
+  boardEl.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    const el = e.target.closest('.cell');
+    if (!el) return;
+    toggleFlag(Number(el.dataset.i));
+  });
+
+  boardEl.addEventListener('click', (e) => {
+    const el = e.target.closest('.cell');
+    if (!el) return;
+    if (suppressClick) { suppressClick = false; return; }
+    handlePrimary(Number(el.dataset.i));
+  });
+
+  boardEl.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    if (game && (game.status === 'lost' || game.status === 'won')) return;
+    pressing = true;
+    updateFace();
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (pressing) { pressing = false; updateFace(); }
+  });
+
+  // --- Touch: long-press to flag ---
+  boardEl.addEventListener('touchstart', (e) => {
+    const el = e.target.closest('.cell');
+    if (!el) return;
+    const i = Number(el.dataset.i);
+    clearTimeout(longPressTimer);
+    longPressTimer = setTimeout(() => {
+      longPressTimer = null;
+      suppressClick = true;
+      toggleFlag(i);
+      if (navigator.vibrate) { try { navigator.vibrate(18); } catch (err) {} }
+      setTimeout(() => { suppressClick = false; }, 600);
+    }, 400);
+  }, { passive: true });
+
+  const cancelLongPress = () => {
+    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+  };
+  boardEl.addEventListener('touchend', cancelLongPress);
+  boardEl.addEventListener('touchcancel', cancelLongPress);
+  boardEl.addEventListener('touchmove', cancelLongPress, { passive: true });
+
+  /* =========================================================
+     Controls
+     ========================================================= */
+  faceEl.addEventListener('click', () => {
+    newGame(currentDiff);
+  });
+
+  diffBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const diff = btn.dataset.diff;
+      if (!DIFFS[diff]) return;
+      if (game) save();
+      const prefs = loadJSON(PREF_KEY, {});
+      prefs.difficulty = diff;
+      saveJSON(PREF_KEY, prefs);
+      loadOrNew(diff);
+    });
+  });
+
+  flagBtn.addEventListener('click', () => {
+    flagMode = !flagMode;
+    const prefs = loadJSON(PREF_KEY, {});
+    prefs.flagMode = flagMode;
+    saveJSON(PREF_KEY, prefs);
+    updateFlagToggle();
+  });
+
+  /* =========================================================
+     Resize
+     ========================================================= */
+  let resizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(fitBoard, 120);
+  });
+
+  /* =========================================================
+     Boot
+     ========================================================= */
+  function init() {
+    const prefs = loadJSON(PREF_KEY, {});
+    flagMode = !!prefs.flagMode;
+    currentDiff = DIFFS[prefs.difficulty] ? prefs.difficulty : 'beginner';
+
+    updateFlagToggle();
+    loadOrNew(currentDiff);
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
